@@ -1,8 +1,9 @@
-"use client"
+"use client";
+
 
 import { useState, useRef } from "react"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
-import { storage } from "@/lib/firebase"
+import { storage } from "@/firebase"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -41,10 +42,12 @@ Follow-up appointment scheduled for next week.`) //placeholder..will remove late
     medications: ["Metformin 500mg", "Lisinopril 10mg", "Aspirin 81mg"],
   }
 
-  const handleRecord = async () => {
-   if (!isRecording) {
+const handleRecord = async () => {
+    console.log("function called...")
+    if (!isRecording) {
       // Start recording
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      console.log("mic permissions sorted...")
       const mediaRecorder = new MediaRecorder(stream)
       mediaRecorderRef.current = mediaRecorder
       audioChunksRef.current = []
@@ -52,21 +55,19 @@ Follow-up appointment scheduled for next week.`) //placeholder..will remove late
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) audioChunksRef.current.push(event.data)
       }
+      console.log("Recording available...")
 
       mediaRecorder.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" })
-        const patientId = "P001" // example; replace with dynamic patient ID
-        const storageRef = ref(storage, `patients/${patientId}/recordings/${Date.now()}.webm`)
+        const patientId = patientData.id // example; replace with dynamic patient ID
+        const formData = new FormData()
+        formData.append('audio', audioBlob, `${Date.now()}.webm`)
+        formData.append('patientId', patientId)
 
-        // Upload to Firebase Storage
-        await uploadBytes(storageRef, audioBlob)
-        const audioUrl = await getDownloadURL(storageRef)
-
-        // Send to backend for transcription
-        const res = await fetch("/api/transcribe", {
+        // Send to backend for saving and transcription
+        const res = await fetch("http://127.0.0.1:8000/api/transcribe", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ audioUrl, patientId }),
+          body: formData,
         })
 
         const data = await res.json()
@@ -80,11 +81,7 @@ Follow-up appointment scheduled for next week.`) //placeholder..will remove late
       mediaRecorderRef.current?.stop()
       setIsRecording(false)
     } 
-    
-    // setIsRecording(!isRecording)
-    // // In a real app, this would start/stop audio recording
-    // console.log(isRecording ? "Stopping recording..." : "Starting recording...")
-  }
+}
 
   const handleSaveNotes = () => {
     setIsEditingNotes(false)
