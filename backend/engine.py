@@ -102,8 +102,7 @@ def webm_to_mp3(input_path: str, output_path: str):
 
 
 def generate_medical_report(transcript_data: Dict[str, Any]) -> str:
-    instruction = """Copilot, you are a senior doctor in the medical field...
-    (same instructions as before)"""
+    instruction =  "Copilot you are a senior doctor in the medical field. You are aware that when we interact with patients it is mandatory to record the conversation in a way that is accurate and format medical notes that follws the standards outlined for all medical professions. These standards must note down every essential detail about the patient ,process and structure its information so it meets the medical health record standards. This record must be accurate and have the correct medical term in medical standard libraries and should be in a away that includes a standard of patient's meta data. So using this conversation that occurred between you and the patient draft a good medical report. Don't add any new information that's not included in the conversation, and don't make your own assumptions, just place the vital information from the conversation into accurate note structure: Clinical Note: Patient Name: <> Date of Birth: <> Age: <> Sex: <> Medical Record #: <> Date of clinic visit: <> Primary care provider: <> Personal note: <> History of Present Illness: <> Allergies: <> Medications: <> Previous History: Past Medical History: <> Past Surgical History: <> Family History: <> Social History: <> Review of Systems: <> Physical Exam: General appearance: <> Blood Pressure: <> Heart Rate: <> Respiratory Rate: <> Oxygen Saturation: <> Assessment: <> Plan: <> Medical Decision Making: <>\n\n"
     prompt = instruction + record(transcript_data)
     print("Sending prompt to Gemini API...")
 
@@ -158,11 +157,11 @@ def transcribe():
 
         # Cleanup
         os.remove(webm_path)
-        # os.remove(mp3_path)
+        os.remove(mp3_path)
         print(f"Deleted temp files: {webm_path}, {mp3_path}")
 
         print("Returning medical report")
-        return jsonify({'transcript': medical_report})
+        return jsonify({'medical_report': medical_report})
 
     except Exception as e:
         print(f"Error in /api/transcribe: {str(e)}")

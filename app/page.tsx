@@ -1,9 +1,9 @@
 "use client";
 
-
 import { useState, useRef } from "react"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
-import { storage } from "@/firebase"
+import { doc, setDoc, serverTimestamp } from "firebase/firestore"
+import { storage, db } from "@/firebase"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -12,14 +12,16 @@ import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Activity, Heart, Thermometer, User, Calendar, Phone, Mail, Mic, MicOff, Save, Edit3 } from "lucide-react"
+import { toast } from "@/components/ui/use-toast"
 
 export default function PatientDashboard() {
   const [isRecording, setIsRecording] = useState(false)
   const [notes, setNotes] = useState(`Patient shows improvement in mobility since last visit. 
 Vital signs are stable and within normal range. 
 Continue current medication regimen.
-Follow-up appointment scheduled for next week.`) //placeholder..will remove later
+Follow-up appointment scheduled for next week.`)
   const [isEditingNotes, setIsEditingNotes] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
 
@@ -38,11 +40,11 @@ Follow-up appointment scheduled for next week.`) //placeholder..will remove late
       temperature: 98.6,
       oxygenSat: 98,
     },
-    conditions: ["Hypertension", "Type 2 Diabetes"],
+    conditions: ["Hypertension", "Type 2 Diabetes", "Anemia"],
     medications: ["Metformin 500mg", "Lisinopril 10mg", "Aspirin 81mg"],
   }
 
-const handleRecord = async () => {
+  const handleRecord = async () => {
     console.log("function called...")
     if (!isRecording) {
       // Start recording
@@ -59,7 +61,7 @@ const handleRecord = async () => {
 
       mediaRecorder.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" })
-        const patientId = patientData.id // example; replace with dynamic patient ID
+        const patientId = patientData.id
         const formData = new FormData()
         formData.append('audio', audioBlob, `${Date.now()}.webm`)
         formData.append('patientId', patientId)
@@ -71,7 +73,7 @@ const handleRecord = async () => {
         })
 
         const data = await res.json()
-        setNotes(data.transcript) // pre-fill notes for doctor
+        setNotes(data.medical_report)
       }
 
       mediaRecorder.start()
@@ -81,12 +83,38 @@ const handleRecord = async () => {
       mediaRecorderRef.current?.stop()
       setIsRecording(false)
     } 
-}
+  }
 
-  const handleSaveNotes = () => {
-    setIsEditingNotes(false)
-    // In a real app, this would save to database
-    console.log("Notes saved:", notes)
+  const handleSaveNotes = async () => {
+    setIsSaving(true)
+    try {
+      // Convert notes to a Blob for Firebase Storage
+      const notesBlob = new Blob([notes], { type: "text/plain" })
+      const patientId = patientData.id
+      // Create a reference in Firebase Storage under patients/{patientId}/notes/
+      const notesRef = ref(storage, `patients/${patientId}/notes/${Date.now()}.txt`)
+
+      // Upload the notes to Firebase Storage
+      await uploadBytes(notesRef, notesBlob)
+      
+      // Get the download URL for the uploaded notes
+      const downloadURL = await getDownloadURL(notesRef)
+
+      setIsEditingNotes(false)
+      toast({
+        title: "Success",
+        description: "Notes saved successfully to Firebase Storage",
+      })
+    } catch (error) {
+      console.error("Error saving notes:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save notes. Please try again.",
+        variant: "destructive"
+      })
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
@@ -327,11 +355,18 @@ const handleRecord = async () => {
                       placeholder="Enter patient notes..."
                     />
                     <div className="flex gap-2">
-                      <Button onClick={handleSaveNotes}>
+                      <Button 
+                        onClick={handleSaveNotes} 
+                        disabled={isSaving}
+                      >
                         <Save className="h-4 w-4 mr-2" />
-                        Save Notes
+                        {isSaving ? "Saving..." : "Save Notes"}
                       </Button>
-                      <Button variant="outline" onClick={() => setIsEditingNotes(false)}>
+                      <Button 
+                        variant="outline" 
+                        onClick={() => setIsEditingNotes(false)}
+                        disabled={isSaving}
+                      >
                         Cancel
                       </Button>
                     </div>
